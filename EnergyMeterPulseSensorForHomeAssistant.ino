@@ -20,7 +20,8 @@
 
    REVISION HISTORY
    Version 1.0 - Henrik Ekblad
-
+   Version 2.0 - KinDR007 12.2020
+   
    DESCRIPTION
    This sketch provides an example how to implement a LM393 PCB
    Use this sensor to measure kWh and Watt of your house meter
@@ -28,6 +29,18 @@
    The sensor starts by fetching current kWh value from gateway.
    Reports both kWh and Watt back to gateway.
 
+   Version 2.0
+   Moded for Home Assistant
+   Fix V_Var1 first run
+   Send 0 Watt after 2 min if no pulse detected
+    - send 0 watt only if watt its not 0
+
+   connection 
+    use resistor between D2 pin and GND (on Arduino Nano ) and connect +5Vcc from Arduino Nano to S0+ and D2 pin to S0-
+   
+   Gateway connection https://www.mysensors.org/build/connect_radio
+   Gateway script     https://www.mysensors.org/build/serial_gateway
+   
    Unfortunately millis() won't increment when the Arduino is in
    sleepmode. So we cannot make this sensor sleep if we also want
    to calculate/report watt value.
@@ -35,11 +48,12 @@
 */
 
 
-//#define MY_DEBUG                               // Enable debug prints
+#define MY_DEBUG                               // Enable debug prints
 
 #define MY_NODE_ID 31 //31 FVE 30 CEZ          // define node id or set MY_NODE_ID(AUTO)
-
-#define MY_RF24_CHANNEL 90
+#define SKETCHNAME "Energy Meter FVE"
+#define SKETCHVERSION "2.0"
+#define MY_RF24_CHANNEL 90                      
 
 // Enable and select radio type attached
 #define MY_RADIO_RF24
@@ -47,7 +61,7 @@
 //#define MY_RADIO_RFM69
 //#define MY_RADIO_RFM95
 
-#include <MySensors.h>                        // Tested on v2.3.2
+#include <MySensors.h>                        // Tested on MySensors v2.3.2 and Arduino sw v1.8.13 for Mac OsX
 
 #define DIGITAL_INPUT_SENSOR 2                // The digital input you attached your light sensor.  (Only 2 and 3 generates interrupt!)
 #define PULSE_FACTOR 2000                     // Number of blinks per of your meter (Hutermann HT-1PM has 2000 pulses per Kwh)
@@ -100,7 +114,7 @@ void setup()
 void presentation()
 {
 
-  sendSketchInfo("Energy Meter FVE", "2.0");                          // Send the sketch version information to the gateway and Controller
+  sendSketchInfo(SKETCHNAME, SKETCHVERSION);                          // Send the sketch version information to the gateway and Controller
 
   present(WATT_CHILD_ID, S_POWER, "watt", false);
   present(KWH_CHILD_ID, S_POWER, "kwh", false);
@@ -126,8 +140,11 @@ void loop()
       oldWatt = watt;
     }
 
-    if (now - lastPulse > 120000) {                                   //If No Pulse count in 2min set watt to zero
+    if (now - lastPulse > 120000 && watt != 0) {                                   //If No Pulse count in 2min set watt to zero
       watt = 0;
+#ifdef MY_DEBUG
+        Serial.println("Sett Watt to : 0");
+#endif      
       if (watt < ((uint32_t)MAX_WATT)) {
 #ifdef MY_DEBUG
         Serial.print("2 min delay no pulse :");
